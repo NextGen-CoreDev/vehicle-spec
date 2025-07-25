@@ -8,6 +8,7 @@ interface PhotoSection {
   label: string
   id: string
   imagePath: string
+  fallbackPath: string
 }
 
 interface VehicleDisplayProps {
@@ -22,6 +23,7 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 })
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
 
   const openImageModal = (imageId: string) => {
     setSelectedImage(imageId)
@@ -76,6 +78,10 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
     setIsDragging(false)
   }
 
+  const handleImageError = (imageId: string) => {
+    setImageErrors((prev) => ({ ...prev, [imageId]: true }))
+  }
+
   // Handle keyboard events
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -95,7 +101,28 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
     }
   }, [isModalOpen])
 
-  // Create photo sections from Airtable images
+  // Fallback data when Airtable is not available
+  const fallbackVehicleData = {
+    "Vehicle ID": "MERC2023001",
+    Year: 2023,
+    Make: "Mercedes Benz",
+    Model: "S580",
+    Trim: "4MATIC",
+    VIN: "W1K6G7GB1PA123456",
+    Mileage: 10420,
+    "Zip Code": "90210",
+    "Exterior Color": "Obsidian Black",
+    "Interior Color": "Macchiato Beige",
+    "Vehicle Condition": "Excellent",
+    "Tire Condition": "Medium Wear",
+    "Add-ons": 'AMG Line Package, Ceramic Coating, 22" AMG Wheels',
+    Status: "Active",
+  }
+
+  // Use Airtable data if available, otherwise use fallback
+  const displayData = vehicleData || fallbackVehicleData
+
+  // Create photo sections with beautiful placeholder images
   const photoSections: PhotoSection[] = React.useMemo(() => {
     const imageTypes = [
       "Front",
@@ -110,14 +137,34 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
     ]
 
     return imageTypes.map((type) => {
-      const image = images.find((img) => img["Image Type"] === type)
+      // Try to get image from Airtable first
+      const airtableImage = images.find((img) => img["Image Type"] === type)
+
+      // Beautiful placeholder images matching the TRADELUX aesthetic
+      const placeholderImages: Record<string, string> = {
+        Front: "/images/placeholders/front-placeholder.png",
+        Rear: "/images/placeholders/rear-placeholder.png",
+        "Driver Side": "/images/placeholders/driver-side-placeholder.png",
+        "Passenger Side": "/images/placeholders/passenger-side-placeholder.png",
+        Interior: "/images/placeholders/interior-placeholder.png",
+        Dashboard: "/images/placeholders/dashboard-placeholder.png",
+        Tires: "/images/placeholders/tires-placeholder.png",
+        "Window Sticker": "/images/placeholders/window-sticker-placeholder.png",
+        "Add-Ons Damage": "/images/placeholders/damage-placeholder.png",
+      }
+
+      const imageId = type.toLowerCase().replace(/\s+/g, "-")
+      const hasError = imageErrors[imageId]
+      const airtableUrl = airtableImage?.["Image URL"]
+
       return {
         label: type,
-        id: type.toLowerCase().replace(/\s+/g, "-"),
-        imagePath: image?.["Image URL"] || "/placeholder.svg?height=400&width=400&text=" + encodeURIComponent(type),
+        id: imageId,
+        imagePath: hasError || !airtableUrl ? placeholderImages[type] : airtableUrl,
+        fallbackPath: placeholderImages[type],
       }
     })
-  }, [images])
+  }, [images, imageErrors])
 
   const selectedImageData = photoSections.find((section) => section.id === selectedImage)
 
@@ -134,89 +181,76 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
     )
   }
 
-  // Error state
-  if (error || !vehicleData) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <h2 className="text-2xl font-bold text-yellow-400 mb-4">TRADELUX</h2>
-          <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-6">
-            <h3 className="text-xl font-semibold text-red-400 mb-2">Vehicle Not Found</h3>
-            <p className="text-gray-300 mb-4">{error || "The requested vehicle could not be found in our system."}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-yellow-400 text-black px-4 py-2 rounded hover:bg-yellow-300 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Show error but continue with fallback data
+  const showError = error && !vehicleData
 
   return (
     <div className="min-h-screen bg-black text-white p-6 flex flex-col">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-yellow-400 tracking-wider mb-4">TRADELUX</h1>
+        {showError && (
+          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 max-w-md mx-auto mb-4">
+            <p className="text-yellow-300 text-sm">⚠️ Using demo data - Airtable connection unavailable</p>
+          </div>
+        )}
       </div>
 
       {/* Vehicle Specifications Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4 mb-8 max-w-6xl mx-auto w-full">
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Year</span>
-          <span className="text-white font-medium">{vehicleData.Year}</span>
+          <span className="text-white font-medium">{displayData.Year}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Make</span>
-          <span className="text-white font-medium">{vehicleData.Make}</span>
+          <span className="text-white font-medium">{displayData.Make}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Model</span>
-          <span className="text-white font-medium">{vehicleData.Model}</span>
+          <span className="text-white font-medium">{displayData.Model}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">VIN</span>
-          <span className="text-white font-medium">{vehicleData.VIN}</span>
+          <span className="text-white font-medium">{displayData.VIN}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Mileage</span>
-          <span className="text-white font-medium">{vehicleData.Mileage?.toLocaleString()}</span>
+          <span className="text-white font-medium">{displayData.Mileage?.toLocaleString()}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Zip Code</span>
-          <span className="text-white font-medium">{vehicleData["Zip Code"] || "—"}</span>
+          <span className="text-white font-medium">{displayData["Zip Code"] || "—"}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Exterior Color</span>
-          <span className="text-white font-medium">{vehicleData["Exterior Color"]}</span>
+          <span className="text-white font-medium">{displayData["Exterior Color"]}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Interior Color</span>
-          <span className="text-white font-medium">{vehicleData["Interior Color"]}</span>
+          <span className="text-white font-medium">{displayData["Interior Color"]}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Vehicle Condition</span>
-          <span className="text-white font-medium">{vehicleData["Vehicle Condition"]}</span>
+          <span className="text-white font-medium">{displayData["Vehicle Condition"]}</span>
         </div>
 
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Tire Condition</span>
-          <span className="text-white font-medium">{vehicleData["Tire Condition"]}</span>
+          <span className="text-white font-medium">{displayData["Tire Condition"]}</span>
         </div>
 
         <div className="flex flex-col col-span-2">
           <span className="text-yellow-400 text-sm mb-1">Add-ons</span>
-          <span className="text-white font-medium">{vehicleData["Add-ons"]}</span>
+          <span className="text-white font-medium">{displayData["Add-ons"]}</span>
         </div>
       </div>
 
@@ -231,11 +265,12 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
               <div className="w-full h-full relative group-hover:scale-105 transition-transform duration-200">
                 <Image
                   src={section.imagePath || "/placeholder.svg"}
-                  alt={`${vehicleData.Year} ${vehicleData.Make} ${vehicleData.Model} - ${section.label}`}
+                  alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${section.label}`}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   priority={section.id === "front"}
+                  onError={() => handleImageError(section.id)}
                 />
               </div>
             </div>
@@ -359,7 +394,7 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
                 >
                   <Image
                     src={selectedImageData.imagePath || "/placeholder.svg"}
-                    alt={`${vehicleData.Year} ${vehicleData.Make} ${vehicleData.Model} - ${selectedImageData.label}`}
+                    alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${selectedImageData.label}`}
                     width={800}
                     height={600}
                     className="object-contain"
@@ -370,6 +405,7 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
                       maxHeight: "60vh",
                     }}
                     priority
+                    onError={() => handleImageError(selectedImageData.id)}
                   />
                 </div>
               </div>
@@ -378,7 +414,7 @@ export default function VehicleDisplay({ vehicleId = "default-vehicle" }: Vehicl
               <div className="text-center">
                 <h3 className="text-yellow-400 text-xl font-bold mb-2">{selectedImageData.label}</h3>
                 <p className="text-gray-300 text-sm">
-                  {vehicleData.Year} {vehicleData.Make} {vehicleData.Model}
+                  {displayData.Year} {displayData.Make} {displayData.Model}
                 </p>
               </div>
             </div>
