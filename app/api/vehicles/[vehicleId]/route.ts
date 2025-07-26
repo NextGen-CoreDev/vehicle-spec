@@ -22,12 +22,22 @@ export async function GET(
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    // Get vehicle images
-    const images = await AirtableService.getVehicleImages(vehicleId);
+    // Extract image URLs from the vehicle record
+    const images = {
+      "Front Image": vehicle.fields["Front Image"],
+      "Rear Image": vehicle.fields["Rear Image"],
+      "Drive Side Image": vehicle.fields["Drive Side Image"],
+      "Passenger Side Image": vehicle.fields["Passenger Side Image"],
+      "Interior Image": vehicle.fields["Interior Image"],
+      "Dashboard Image": vehicle.fields["Dashboard Image"],
+      "Tires Image": vehicle.fields["Tires Image"],
+      "Window Sticker Image": vehicle.fields["Window Sticker Image"],
+      "Add-ons Damage Image": vehicle.fields["Add-ons Damage Image"],
+    };
 
     return NextResponse.json({
       vehicle: vehicle.fields,
-      images: images.map((img) => img.fields),
+      images,
     });
   } catch (error) {
     console.error("API Error:", error);

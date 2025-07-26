@@ -8,7 +8,6 @@ const base = new Airtable({
 // Define the table names
 export const TABLES = {
   VEHICLES: "Vehicles",
-  VEHICLE_IMAGES: "Vehicle Images",
 } as const;
 
 // Types for Airtable records
@@ -31,26 +30,16 @@ export interface VehicleRecord {
     Status: "Active" | "Sold" | "Pending";
     Created: string;
     Updated: string;
-  };
-}
-
-export interface VehicleImageRecord {
-  id: string;
-  fields: {
-    "Vehicle ID": string;
-    "Image Type":
-      | "Front"
-      | "Rear"
-      | "Driver Side"
-      | "Passenger Side"
-      | "Interior"
-      | "Dashboard"
-      | "Tires"
-      | "Window Sticker"
-      | "Add-Ons Damage";
-    "Image URL": string;
-    "Alt Text"?: string;
-    Order: number;
+    // Image URL columns
+    "Front Image"?: string;
+    "Rear Image"?: string;
+    "Drive Side Image"?: string;
+    "Passenger Side Image"?: string;
+    "Interior Image"?: string;
+    "Dashboard Image"?: string;
+    "Tires Image"?: string;
+    "Window Sticker Image"?: string;
+    "Add-ons Damage Image"?: string;
   };
 }
 
@@ -86,25 +75,6 @@ export class AirtableService {
       return records as VehicleRecord[];
     } catch (error) {
       console.error("Error fetching vehicles:", error);
-      return [];
-    }
-  }
-
-  // Get vehicle images
-  static async getVehicleImages(
-    vehicleId: string
-  ): Promise<VehicleImageRecord[]> {
-    try {
-      const records = await base(TABLES.VEHICLE_IMAGES)
-        .select({
-          filterByFormula: `{VIN} = '${vehicleId}'`,
-          sort: [{ field: "Order", direction: "asc" }],
-        })
-        .all();
-
-      return records as VehicleImageRecord[];
-    } catch (error) {
-      console.error("Error fetching vehicle images:", error);
       return [];
     }
   }
@@ -151,24 +121,6 @@ export class AirtableService {
       return record[0] as VehicleRecord;
     } catch (error) {
       console.error("Error updating vehicle:", error);
-      return null;
-    }
-  }
-
-  // Add vehicle image
-  static async addVehicleImage(
-    imageData: Partial<VehicleImageRecord["fields"]>
-  ): Promise<VehicleImageRecord | null> {
-    try {
-      const record = await base(TABLES.VEHICLE_IMAGES).create([
-        {
-          fields: imageData as VehicleImageRecord["fields"],
-        },
-      ]);
-
-      return record[0] as VehicleImageRecord;
-    } catch (error) {
-      console.error("Error adding vehicle image:", error);
       return null;
     }
   }

@@ -9,6 +9,7 @@ interface PhotoSection {
   id: string;
   imagePath: string;
   fallbackPath: string;
+  airtableColumn: string;
 }
 
 interface VehicleDisplayProps {
@@ -146,24 +147,21 @@ export default function VehicleDisplay({
   // Use Airtable data if available, otherwise use fallback
   const displayData = vehicleData || fallbackVehicleData;
 
-  // Create photo sections with beautiful placeholder images
+  // Create photo sections with Airtable image URLs
   const photoSections: PhotoSection[] = React.useMemo(() => {
-    const imageTypes = [
-      "Front",
-      "Rear",
-      "Driver Side",
-      "Passenger Side",
-      "Interior",
-      "Dashboard",
-      "Tires",
-      "Window Sticker",
-      "Add-Ons Damage",
+    const sectionConfig = [
+      { label: "Front", airtableColumn: "Front Image" },
+      { label: "Rear", airtableColumn: "Rear Image" },
+      { label: "Driver Side", airtableColumn: "Drive Side Image" },
+      { label: "Passenger Side", airtableColumn: "Passenger Side Image" },
+      { label: "Interior", airtableColumn: "Interior Image" },
+      { label: "Dashboard", airtableColumn: "Dashboard Image" },
+      { label: "Tires", airtableColumn: "Tires Image" },
+      { label: "Window Sticker", airtableColumn: "Window Sticker Image" },
+      { label: "Add-Ons Damage", airtableColumn: "Add-ons Damage Image" },
     ];
 
-    return imageTypes.map((type) => {
-      // Try to get image from Airtable first
-      const airtableImage = images.find((img) => img["Image Type"] === type);
-
+    return sectionConfig.map((config) => {
       // Beautiful placeholder images matching the TRADELUX aesthetic
       const placeholderImages: Record<string, string> = {
         Front: "/images/placeholders/front-placeholder.png",
@@ -177,16 +175,25 @@ export default function VehicleDisplay({
         "Add-Ons Damage": "/images/placeholders/damage-placeholder.png",
       };
 
-      const imageId = type.toLowerCase().replace(/\s+/g, "-");
+      const imageId = config.label.toLowerCase().replace(/\s+/g, "-");
       const hasError = imageErrors[imageId];
-      const airtableUrl = airtableImage?.["Image URL"];
+
+      // Get the image URL from Airtable data
+      const airtableImageUrl =
+        images[config.airtableColumn as keyof typeof images];
+
+      // Use Airtable image if available and no error, otherwise use placeholder
+      const imagePath =
+        hasError || !airtableImageUrl
+          ? placeholderImages[config.label]
+          : airtableImageUrl;
 
       return {
-        label: type,
+        label: config.label,
         id: imageId,
-        imagePath:
-          hasError || !airtableUrl ? placeholderImages[type] : airtableUrl,
-        fallbackPath: placeholderImages[type],
+        imagePath,
+        fallbackPath: placeholderImages[config.label],
+        airtableColumn: config.airtableColumn,
       };
     });
   }, [images, imageErrors]);
@@ -337,7 +344,7 @@ export default function VehicleDisplay({
         <p className="mt-1">
           To submit an offer, reply to{" "}
           <a
-            href="mailto:Pricing@tradelux.us?subject=Vehicle Offer - 2023 Mercedes Benz S580&body=Hello TRADELUX,%0D%0A%0D%0AI am interested in submitting an offer for the 2023 Mercedes Benz S580 (VIN: W1K6G7GB1PA123456).%0D%0A%0D%0AMy offer details:%0D%0A- Offer Amount: $%0D%0A- Financing: %0D%0A- Additional Comments: %0D%0A%0D%0APlease let me know if you need any additional information.%0D%0A%0D%0AThank you,%0D%0A[Your Name]"
+            href={`mailto:Pricing@tradelux.us?subject=Vehicle Offer - ${displayData.Year} ${displayData.Make} ${displayData.Model}&body=Hello TRADELUX,%0D%0A%0D%0AI am interested in submitting an offer for the ${displayData.Year} ${displayData.Make} ${displayData.Model} (VIN: ${displayData.VIN}).%0D%0A%0D%0AMy offer details:%0D%0A- Offer Amount: $%0D%0A- Financing: %0D%0A- Additional Comments: %0D%0A%0D%0APlease let me know if you need any additional information.%0D%0A%0D%0AThank you,%0D%0A[Your Name]`}
             className="text-yellow-400 hover:text-yellow-300 transition-colors duration-200 underline decoration-yellow-400/50 hover:decoration-yellow-300 underline-offset-2"
           >
             Pricing@tradelux.us
