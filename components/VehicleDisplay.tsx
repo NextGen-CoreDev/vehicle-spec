@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useVehicleData } from "@/hooks/useVehicleData";
 
@@ -27,10 +27,37 @@ export default function VehicleDisplay({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Mobile gallery state
+  const [currentMobileIndex, setCurrentMobileIndex] = useState(0);
+
+  // Touch/swipe handling for mobile gallery
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const openImageModal = (imageId: string) => {
     setSelectedImage(imageId);
     setIsModalOpen(true);
+    // Find the index of the selected image
+    const index = photoSections.findIndex((section) => section.id === imageId);
+    setCurrentImageIndex(index);
   };
 
   const closeImageModal = () => {
@@ -103,6 +130,102 @@ export default function VehicleDisplay({
     setIsDragging(false);
   };
 
+  // Touch handlers for mobile gallery swipe
+  const handleMobileGalleryTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const handleMobileGalleryTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const handleMobileGalleryTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isLeftSwipe = distanceX > 50;
+    const isRightSwipe = distanceX < -50;
+    const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
+
+    // Only handle horizontal swipes, ignore vertical ones
+    if (!isVerticalSwipe) {
+      if (isLeftSwipe && currentMobileIndex < photoSections.length - 1) {
+        // Swipe left - next image
+        setCurrentMobileIndex(currentMobileIndex + 1);
+      }
+      if (isRightSwipe && currentMobileIndex > 0) {
+        // Swipe right - previous image
+        setCurrentMobileIndex(currentMobileIndex - 1);
+      }
+    }
+  };
+
+  // Touch handlers for modal swipe functionality
+  const handleModalTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const handleModalTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const handleModalTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isLeftSwipe = distanceX > 50;
+    const isRightSwipe = distanceX < -50;
+    const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
+
+    // Only handle horizontal swipes, ignore vertical ones
+    if (!isVerticalSwipe) {
+      if (isLeftSwipe && currentImageIndex < photoSections.length - 1) {
+        // Swipe left - next image
+        navigateToImage(currentImageIndex + 1);
+      }
+      if (isRightSwipe && currentImageIndex > 0) {
+        // Swipe right - previous image
+        navigateToImage(currentImageIndex - 1);
+      }
+    }
+  };
+
+  const navigateToImage = (index: number) => {
+    if (index >= 0 && index < photoSections.length) {
+      setCurrentImageIndex(index);
+      setSelectedImage(photoSections[index].id);
+      resetZoom(); // Reset zoom when changing images
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (currentImageIndex > 0) {
+      navigateToImage(currentImageIndex - 1);
+    }
+  };
+
+  const handleNextImage = () => {
+    if (currentImageIndex < photoSections.length - 1) {
+      navigateToImage(currentImageIndex + 1);
+    }
+  };
+
   const handleImageError = (imageId: string) => {
     setImageErrors((prev) => ({ ...prev, [imageId]: true }));
   };
@@ -110,8 +233,14 @@ export default function VehicleDisplay({
   // Handle keyboard events
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isModalOpen) {
-        closeImageModal();
+      if (isModalOpen) {
+        if (event.key === "Escape") {
+          closeImageModal();
+        } else if (event.key === "ArrowLeft") {
+          handlePrevImage();
+        } else if (event.key === "ArrowRight") {
+          handleNextImage();
+        }
       }
     };
 
@@ -124,7 +253,7 @@ export default function VehicleDisplay({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "unset";
     };
-  }, [isModalOpen]);
+  }, [isModalOpen, currentImageIndex]);
 
   // Fallback data when Airtable is not available
   const fallbackVehicleData = {
@@ -198,9 +327,7 @@ export default function VehicleDisplay({
     });
   }, [images, imageErrors]);
 
-  const selectedImageData = photoSections.find(
-    (section) => section.id === selectedImage
-  );
+  const selectedImageData = photoSections[currentImageIndex];
 
   // Loading state
   if (loading) {
@@ -222,9 +349,7 @@ export default function VehicleDisplay({
     <div className="min-h-screen bg-black text-white p-6 flex flex-col">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-yellow-400 tracking-wider mb-4">
-          TRADELUX
-        </h1>
+        <img className="h-48 m-auto" src="/images/logo.png" />
         {showError && (
           <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 max-w-md mx-auto mb-4">
             <p className="text-yellow-300 text-sm">
@@ -249,6 +374,11 @@ export default function VehicleDisplay({
         <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Model</span>
           <span className="text-white font-medium">{displayData.Model}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="text-yellow-400 text-sm mb-1">Trim</span>
+          <span className="text-white font-medium">{displayData.Trim}</span>
         </div>
 
         <div className="flex flex-col">
@@ -300,7 +430,7 @@ export default function VehicleDisplay({
           </span>
         </div>
 
-        <div className="flex flex-col col-span-2">
+        <div className="flex flex-col">
           <span className="text-yellow-400 text-sm mb-1">Add-ons</span>
           <span className="text-white font-medium">
             {displayData["Add-ons"]}
@@ -308,32 +438,143 @@ export default function VehicleDisplay({
         </div>
       </div>
 
-      {/* Photo Grid */}
-      <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto w-full mb-8 flex-1">
-        {photoSections.map((section) => (
-          <div key={section.id} className="flex flex-col">
-            <div
-              className="aspect-square border-2 border-yellow-400 bg-black rounded-sm mb-2 flex items-center justify-center cursor-pointer hover:border-yellow-300 transition-colors duration-200 group overflow-hidden"
-              onClick={() => openImageModal(section.id)}
-            >
-              <div className="w-full h-full relative group-hover:scale-105 transition-transform duration-200">
-                <Image
-                  src={section.imagePath || "/placeholder.svg"}
-                  alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${section.label}`}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  priority={section.id === "front"}
-                  onError={() => handleImageError(section.id)}
-                />
-              </div>
+      {/* Photo Display - Mobile vs Desktop */}
+      {isMobile ? (
+        /* Mobile: Single Image Gallery with Swipe */
+        <div className="max-w-md mx-auto w-full mb-8 flex-1">
+          <div
+            className="relative aspect-square border-2 border-yellow-400 bg-black rounded-sm mb-4 overflow-hidden"
+            onTouchStart={handleMobileGalleryTouchStart}
+            onTouchMove={handleMobileGalleryTouchMove}
+            onTouchEnd={handleMobileGalleryTouchEnd}
+            onClick={() => openImageModal(photoSections[currentMobileIndex].id)}
+          >
+            <div className="w-full h-full relative cursor-pointer">
+              <Image
+                src={
+                  photoSections[currentMobileIndex].imagePath ||
+                  "/placeholder.svg"
+                }
+                alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${photoSections[currentMobileIndex].label}`}
+                fill
+                className="object-cover transition-transform duration-300"
+                sizes="(max-width: 768px) 100vw"
+                priority
+                onError={() =>
+                  handleImageError(photoSections[currentMobileIndex].id)
+                }
+              />
             </div>
-            <span className="text-yellow-400 text-sm text-center font-medium">
-              {section.label}
-            </span>
+
+            {/* Mobile Navigation Arrows */}
+            {currentMobileIndex > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentMobileIndex(currentMobileIndex - 1);
+                }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-60 hover:bg-opacity-80 text-white rounded-full p-2 transition-all duration-200 border border-yellow-400/30"
+                aria-label="Previous image"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+            )}
+
+            {currentMobileIndex < photoSections.length - 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentMobileIndex(currentMobileIndex + 1);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-60 hover:bg-opacity-80 text-white rounded-full p-2 transition-all duration-200 border border-yellow-400/30"
+                aria-label="Next image"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+
+          {/* Mobile Image Info */}
+          <div className="text-center mb-4">
+            <h3 className="text-yellow-400 text-lg font-bold mb-1">
+              {photoSections[currentMobileIndex].label}
+            </h3>
+            <p className="text-gray-400 text-sm mb-2">
+              {currentMobileIndex + 1} of {photoSections.length}
+            </p>
+            <p className="text-gray-300 text-xs">
+              Swipe left or right to view more photos
+            </p>
+          </div>
+
+          {/* Mobile Dot Indicators */}
+          <div className="flex justify-center space-x-2 mb-6">
+            {photoSections.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentMobileIndex(index)}
+                className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                  index === currentMobileIndex
+                    ? "bg-yellow-400 scale-125"
+                    : "bg-gray-600 hover:bg-gray-500"
+                }`}
+                aria-label={`Go to image ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* Desktop: 3x3 Grid */
+        <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto w-full mb-8 flex-1">
+          {photoSections.map((section) => (
+            <div key={section.id} className="flex flex-col">
+              <div
+                className="aspect-square border-2 border-yellow-400 bg-black rounded-sm mb-2 flex items-center justify-center cursor-pointer hover:border-yellow-300 transition-colors duration-200 group overflow-hidden"
+                onClick={() => openImageModal(section.id)}
+              >
+                <div className="w-full h-full relative group-hover:scale-105 transition-transform duration-200">
+                  <Image
+                    src={section.imagePath || "/placeholder.svg"}
+                    alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${section.label}`}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority={section.id === "front"}
+                    onError={() => handleImageError(section.id)}
+                  />
+                </div>
+              </div>
+              <span className="text-yellow-400 text-sm text-center font-medium">
+                {section.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="text-center text-white text-sm max-w-4xl mx-auto">
@@ -358,6 +599,9 @@ export default function VehicleDisplay({
         <div
           className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-4"
           onClick={closeImageModal}
+          onTouchStart={handleModalTouchStart}
+          onTouchMove={handleModalTouchMove}
+          onTouchEnd={handleModalTouchEnd}
         >
           {/* Close Button - Fixed position */}
           <button
@@ -383,6 +627,63 @@ export default function VehicleDisplay({
               />
             </svg>
           </button>
+
+          {/* Navigation Arrows - Desktop */}
+          {!isMobile && (
+            <>
+              {currentImageIndex > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handlePrevImage();
+                  }}
+                  className="fixed left-6 top-1/2 -translate-y-1/2 z-50 bg-black bg-opacity-70 hover:bg-opacity-90 text-white rounded-full p-3 transition-all duration-200 hover:scale-110 border border-yellow-400/30 hover:border-yellow-400"
+                  aria-label="Previous image"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                </button>
+              )}
+
+              {currentImageIndex < photoSections.length - 1 && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleNextImage();
+                  }}
+                  className="fixed right-6 top-1/2 -translate-y-1/2 z-50 bg-black bg-opacity-70 hover:bg-opacity-90 text-white rounded-full p-3 transition-all duration-200 hover:scale-110 border border-yellow-400/30 hover:border-yellow-400"
+                  aria-label="Next image"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              )}
+            </>
+          )}
 
           {/* Zoom Controls */}
           <div className="fixed top-6 left-6 z-50 flex flex-col gap-2">
@@ -459,6 +760,13 @@ export default function VehicleDisplay({
             </button>
           </div>
 
+          {/* Image Counter */}
+          <div className="fixed top-6 right-20 z-50 bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg border border-yellow-400/30">
+            <span className="text-sm text-yellow-400">
+              {currentImageIndex + 1} / {photoSections.length}
+            </span>
+          </div>
+
           {/* Zoom Level Indicator */}
           <div className="fixed bottom-6 left-6 z-50 bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg border border-yellow-400/30">
             <span className="text-sm text-yellow-400">
@@ -530,8 +838,9 @@ export default function VehicleDisplay({
           {/* Instructions */}
           <div className="fixed bottom-6 right-6 z-50 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg border border-yellow-400/30 max-w-xs">
             <p className="text-xs text-gray-300">
-              Use mouse wheel to zoom • Drag to pan when zoomed • Click outside
-              to close
+              {isMobile
+                ? "Swipe left/right to navigate • Pinch to zoom • Tap outside to close"
+                : "Use mouse wheel to zoom • Drag to pan when zoomed • Arrow keys to navigate • Click outside to close"}
             </p>
           </div>
         </div>
