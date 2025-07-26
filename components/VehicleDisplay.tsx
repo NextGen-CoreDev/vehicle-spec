@@ -41,6 +41,7 @@ export default function VehicleDisplay({
   const resetZoom = () => {
     setZoom(1);
     setImagePosition({ x: 0, y: 0 });
+    setIsDragging(false);
   };
 
   const handleZoomIn = () => {
@@ -67,14 +68,32 @@ export default function VehicleDisplay({
         x: e.clientX - imagePosition.x,
         y: e.clientY - imagePosition.y,
       });
+      e.preventDefault();
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging && zoom > 1) {
+      const newX = e.clientX - dragStart.x;
+      const newY = e.clientY - dragStart.y;
+
+      // Calculate the maximum drag bounds based on zoom level
+      const containerWidth = 800; // Base image width
+      const containerHeight = 600; // Base image height
+      const scaledWidth = containerWidth * zoom;
+      const scaledHeight = containerHeight * zoom;
+
+      // Calculate maximum drag distances
+      const maxDragX = Math.max(0, (scaledWidth - containerWidth) / 2);
+      const maxDragY = Math.max(0, (scaledHeight - containerHeight) / 2);
+
+      // Constrain the drag position within bounds
+      const constrainedX = Math.max(-maxDragX, Math.min(maxDragX, newX));
+      const constrainedY = Math.max(-maxDragY, Math.min(maxDragY, newY));
+
       setImagePosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
+        x: constrainedX,
+        y: constrainedY,
       });
     }
   };
@@ -465,10 +484,10 @@ export default function VehicleDisplay({
                 <div
                   className="relative transition-transform duration-200 ease-out"
                   style={{
-                    transform: `scale(${zoom}) translate(${
-                      imagePosition.x / zoom
-                    }px, ${imagePosition.y / zoom}px)`,
+                    transform: `scale(${zoom}) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
                     transformOrigin: "center center",
+                    cursor:
+                      zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default",
                   }}
                 >
                   <Image
