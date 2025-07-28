@@ -22,17 +22,34 @@ export async function GET(
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    // Extract image URLs from the vehicle record
+    // Helper function to convert single image to array or handle existing arrays
+    const normalizeImageField = (imageField: any): string[] => {
+      if (!imageField) return [];
+      if (Array.isArray(imageField)) return imageField.filter(Boolean);
+      return typeof imageField === "string" && imageField.trim()
+        ? [imageField]
+        : [];
+    };
+
+    // Extract image URLs from the vehicle record and convert to arrays
     const images = {
-      "Front Image": vehicle.fields["Front Image"],
-      "Rear Image": vehicle.fields["Rear Image"],
-      "Drive Side Image": vehicle.fields["Drive Side Image"],
-      "Passenger Side Image": vehicle.fields["Passenger Side Image"],
-      "Interior Image": vehicle.fields["Interior Image"],
-      "Dashboard Image": vehicle.fields["Dashboard Image"],
-      "Tires Image": vehicle.fields["Tires Image"],
-      "Window Sticker Image": vehicle.fields["Window Sticker Image"],
-      "Add-ons Damage Image": vehicle.fields["Add-ons Damage Image"],
+      "Front Image": normalizeImageField(vehicle.fields["Front Image"]),
+      "Rear Image": normalizeImageField(vehicle.fields["Rear Image"]),
+      "Drive Side Image": normalizeImageField(
+        vehicle.fields["Drive Side Image"]
+      ),
+      "Passenger Side Image": normalizeImageField(
+        vehicle.fields["Passenger Side Image"]
+      ),
+      "Interior Image": normalizeImageField(vehicle.fields["Interior Image"]),
+      "Dashboard Image": normalizeImageField(vehicle.fields["Dashboard Image"]),
+      "Tires Image": normalizeImageField(vehicle.fields["Tires Image"]),
+      "Window Sticker Image": normalizeImageField(
+        vehicle.fields["Window Sticker Image"]
+      ),
+      "Add-ons Damage Image": normalizeImageField(
+        vehicle.fields["Add-ons Damage Image"]
+      ),
     };
 
     return NextResponse.json({

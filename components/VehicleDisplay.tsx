@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useVehicleData } from "@/hooks/useVehicleData";
 
-interface PhotoSection {
+interface PhotoType {
   label: string;
   id: string;
-  imagePath: string;
-  fallbackPath: string;
   airtableColumn: string;
+  images: string[];
 }
 
 interface VehicleDisplayProps {
@@ -26,20 +25,21 @@ export default function VehicleDisplay({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
-  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [isMobile, setIsMobile] = useState(false);
 
-  // Mobile gallery state
-  const [currentMobileIndex, setCurrentMobileIndex] = useState(0);
+  // Current image navigation state
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [allImages, setAllImages] = useState<
+    Array<{ url: string; type: string; typeIndex: number }>
+  >([]);
 
-  // Touch/swipe handling for mobile gallery
+  // Touch/swipe handling
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(
     null
   );
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(
     null
   );
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Detect mobile device
   useEffect(() => {
@@ -52,11 +52,69 @@ export default function VehicleDisplay({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const openImageModal = (imageId: string) => {
-    setSelectedImage(imageId);
+  // Create photo types with actual images only
+  const photoTypes: PhotoType[] = React.useMemo(() => {
+    const typeConfig = [
+      { label: "Front", airtableColumn: "Front Image" },
+      { label: "Rear", airtableColumn: "Rear Image" },
+      {
+        label: "Driver Side",
+        airtableColumn: "Drive Side Image",
+      },
+      {
+        label: "Passenger Side",
+        airtableColumn: "Passenger Side Image",
+      },
+      {
+        label: "Interior",
+        airtableColumn: "Interior Image",
+      },
+      {
+        label: "Dashboard",
+        airtableColumn: "Dashboard Image",
+      },
+      { label: "Tires", airtableColumn: "Tires Image" },
+      {
+        label: "Window Sticker",
+        airtableColumn: "Window Sticker Image",
+      },
+      {
+        label: "Add-Ons Damage",
+        airtableColumn: "Add-ons Damage Image",
+      },
+    ];
+
+    return typeConfig
+      .map((config) => ({
+        label: config.label,
+        id: config.label.toLowerCase().replace(/\s+/g, "-"),
+        airtableColumn: config.airtableColumn,
+        images: images[config.airtableColumn as keyof typeof images] || [],
+      }))
+      .filter((type) => type.images.length > 0); // Only include types with actual images
+  }, [images]);
+
+  // Create flattened array of all images for modal navigation
+  useEffect(() => {
+    const flatImages: Array<{ url: string; type: string; typeIndex: number }> =
+      [];
+    photoTypes.forEach((type) => {
+      type.images.forEach((imageUrl, index) => {
+        flatImages.push({
+          url: imageUrl,
+          type: type.label,
+          typeIndex: index,
+        });
+      });
+    });
+    setAllImages(flatImages);
+  }, [photoTypes]);
+
+  const openImageModal = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
     setIsModalOpen(true);
-    // Find the index of the selected image
-    const index = photoSections.findIndex((section) => section.id === imageId);
+    // Find the index of the selected image in the flattened array
+    const index = allImages.findIndex((img) => img.url === imageUrl);
     setCurrentImageIndex(index);
   };
 
@@ -106,16 +164,14 @@ export default function VehicleDisplay({
       const newY = e.clientY - dragStart.y;
 
       // Calculate the maximum drag bounds based on zoom level
-      const containerWidth = 800; // Base image width
-      const containerHeight = 600; // Base image height
+      const containerWidth = 800;
+      const containerHeight = 600;
       const scaledWidth = containerWidth * zoom;
       const scaledHeight = containerHeight * zoom;
 
-      // Calculate maximum drag distances
       const maxDragX = Math.max(0, (scaledWidth - containerWidth) / 2);
       const maxDragY = Math.max(0, (scaledHeight - containerHeight) / 2);
 
-      // Constrain the drag position within bounds
       const constrainedX = Math.max(-maxDragX, Math.min(maxDragX, newX));
       const constrainedY = Math.max(-maxDragY, Math.min(maxDragY, newY));
 
@@ -130,8 +186,8 @@ export default function VehicleDisplay({
     setIsDragging(false);
   };
 
-  // Touch handlers for mobile gallery swipe
-  const handleMobileGalleryTouchStart = (e: React.TouchEvent) => {
+  // Touch handlers for swipe functionality
+  const handleTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart({
       x: e.targetTouches[0].clientX,
@@ -139,14 +195,14 @@ export default function VehicleDisplay({
     });
   };
 
-  const handleMobileGalleryTouchMove = (e: React.TouchEvent) => {
+  const handleTouchMove = (e: React.TouchEvent) => {
     setTouchEnd({
       x: e.targetTouches[0].clientX,
       y: e.targetTouches[0].clientY,
     });
   };
 
-  const handleMobileGalleryTouchEnd = () => {
+  const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
 
     const distanceX = touchStart.x - touchEnd.x;
@@ -155,62 +211,21 @@ export default function VehicleDisplay({
     const isRightSwipe = distanceX < -50;
     const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
 
-    // Only handle horizontal swipes, ignore vertical ones
     if (!isVerticalSwipe) {
-      if (isLeftSwipe && currentMobileIndex < photoSections.length - 1) {
-        // Swipe left - next image
-        setCurrentMobileIndex(currentMobileIndex + 1);
-      }
-      if (isRightSwipe && currentMobileIndex > 0) {
-        // Swipe right - previous image
-        setCurrentMobileIndex(currentMobileIndex - 1);
-      }
-    }
-  };
-
-  // Touch handlers for modal swipe functionality
-  const handleModalTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart({
-      x: e.targetTouches[0].clientX,
-      y: e.targetTouches[0].clientY,
-    });
-  };
-
-  const handleModalTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd({
-      x: e.targetTouches[0].clientX,
-      y: e.targetTouches[0].clientY,
-    });
-  };
-
-  const handleModalTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-
-    const distanceX = touchStart.x - touchEnd.x;
-    const distanceY = touchStart.y - touchEnd.y;
-    const isLeftSwipe = distanceX > 50;
-    const isRightSwipe = distanceX < -50;
-    const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
-
-    // Only handle horizontal swipes, ignore vertical ones
-    if (!isVerticalSwipe) {
-      if (isLeftSwipe && currentImageIndex < photoSections.length - 1) {
-        // Swipe left - next image
+      if (isLeftSwipe && currentImageIndex < allImages.length - 1) {
         navigateToImage(currentImageIndex + 1);
       }
       if (isRightSwipe && currentImageIndex > 0) {
-        // Swipe right - previous image
         navigateToImage(currentImageIndex - 1);
       }
     }
   };
 
   const navigateToImage = (index: number) => {
-    if (index >= 0 && index < photoSections.length) {
+    if (index >= 0 && index < allImages.length) {
       setCurrentImageIndex(index);
-      setSelectedImage(photoSections[index].id);
-      resetZoom(); // Reset zoom when changing images
+      setSelectedImage(allImages[index].url);
+      resetZoom();
     }
   };
 
@@ -221,13 +236,9 @@ export default function VehicleDisplay({
   };
 
   const handleNextImage = () => {
-    if (currentImageIndex < photoSections.length - 1) {
+    if (currentImageIndex < allImages.length - 1) {
       navigateToImage(currentImageIndex + 1);
     }
-  };
-
-  const handleImageError = (imageId: string) => {
-    setImageErrors((prev) => ({ ...prev, [imageId]: true }));
   };
 
   // Handle keyboard events
@@ -276,58 +287,7 @@ export default function VehicleDisplay({
   // Use Airtable data if available, otherwise use fallback
   const displayData = vehicleData || fallbackVehicleData;
 
-  // Create photo sections with Airtable image URLs
-  const photoSections: PhotoSection[] = React.useMemo(() => {
-    const sectionConfig = [
-      { label: "Front", airtableColumn: "Front Image" },
-      { label: "Rear", airtableColumn: "Rear Image" },
-      { label: "Driver Side", airtableColumn: "Drive Side Image" },
-      { label: "Passenger Side", airtableColumn: "Passenger Side Image" },
-      { label: "Interior", airtableColumn: "Interior Image" },
-      { label: "Dashboard", airtableColumn: "Dashboard Image" },
-      { label: "Tires", airtableColumn: "Tires Image" },
-      { label: "Window Sticker", airtableColumn: "Window Sticker Image" },
-      { label: "Add-Ons Damage", airtableColumn: "Add-ons Damage Image" },
-    ];
-
-    return sectionConfig.map((config) => {
-      // Beautiful placeholder images matching the TRADELUX aesthetic
-      const placeholderImages: Record<string, string> = {
-        Front: "/images/placeholders/front-placeholder.png",
-        Rear: "/images/placeholders/rear-placeholder.png",
-        "Driver Side": "/images/placeholders/driver-side-placeholder.png",
-        "Passenger Side": "/images/placeholders/passenger-side-placeholder.png",
-        Interior: "/images/placeholders/interior-placeholder.png",
-        Dashboard: "/images/placeholders/dashboard-placeholder.png",
-        Tires: "/images/placeholders/tires-placeholder.png",
-        "Window Sticker": "/images/placeholders/window-sticker-placeholder.png",
-        "Add-Ons Damage": "/images/placeholders/damage-placeholder.png",
-      };
-
-      const imageId = config.label.toLowerCase().replace(/\s+/g, "-");
-      const hasError = imageErrors[imageId];
-
-      // Get the image URL from Airtable data
-      const airtableImageUrl =
-        images[config.airtableColumn as keyof typeof images];
-
-      // Use Airtable image if available and no error, otherwise use placeholder
-      const imagePath =
-        hasError || !airtableImageUrl
-          ? placeholderImages[config.label]
-          : airtableImageUrl;
-
-      return {
-        label: config.label,
-        id: imageId,
-        imagePath,
-        fallbackPath: placeholderImages[config.label],
-        airtableColumn: config.airtableColumn,
-      };
-    });
-  }, [images, imageErrors]);
-
-  const selectedImageData = photoSections[currentImageIndex];
+  const selectedImageData = allImages[currentImageIndex];
 
   // Loading state
   if (loading) {
@@ -438,141 +398,72 @@ export default function VehicleDisplay({
         </div>
       </div>
 
-      {/* Photo Display - Mobile vs Desktop */}
-      {isMobile ? (
-        /* Mobile: Single Image Gallery with Swipe */
-        <div className="max-w-md mx-auto w-full mb-8 flex-1">
-          <div
-            className="relative aspect-square border-2 border-yellow-400 bg-black rounded-sm mb-4 overflow-hidden"
-            onTouchStart={handleMobileGalleryTouchStart}
-            onTouchMove={handleMobileGalleryTouchMove}
-            onTouchEnd={handleMobileGalleryTouchEnd}
-            onClick={() => openImageModal(photoSections[currentMobileIndex].id)}
-          >
-            <div className="w-full h-full relative cursor-pointer">
-              <Image
-                src={
-                  photoSections[currentMobileIndex].imagePath ||
-                  "/placeholder.svg"
-                }
-                alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${photoSections[currentMobileIndex].label}`}
-                fill
-                className="object-cover transition-transform duration-300"
-                sizes="(max-width: 768px) 100vw"
-                priority
-                onError={() =>
-                  handleImageError(photoSections[currentMobileIndex].id)
-                }
-              />
-            </div>
+      {/* Photo Display - Grouped by Type */}
+      {photoTypes.length > 0 ? (
+        <div className="max-w-6xl mx-auto w-full mb-8 flex-1">
+          {photoTypes.map((photoType) => (
+            <div key={photoType.id} className="mb-8">
+              {/* Photo Type Header */}
+              <h3 className="text-yellow-400 text-xl font-bold mb-4 border-b border-yellow-400/30 pb-2">
+                {photoType.label}
+                <span className="text-sm text-gray-400 ml-2 font-normal">
+                  ({photoType.images.length}{" "}
+                  {photoType.images.length === 1 ? "photo" : "photos"})
+                </span>
+              </h3>
 
-            {/* Mobile Navigation Arrows */}
-            {currentMobileIndex > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentMobileIndex(currentMobileIndex - 1);
-                }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-60 hover:bg-opacity-80 text-white rounded-full p-2 transition-all duration-200 border border-yellow-400/30"
-                aria-label="Previous image"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-            )}
-
-            {currentMobileIndex < photoSections.length - 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentMobileIndex(currentMobileIndex + 1);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-60 hover:bg-opacity-80 text-white rounded-full p-2 transition-all duration-200 border border-yellow-400/30"
-                aria-label="Next image"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Mobile Image Info */}
-          <div className="text-center mb-4">
-            <h3 className="text-yellow-400 text-lg font-bold mb-1">
-              {photoSections[currentMobileIndex].label}
-            </h3>
-            <p className="text-gray-400 text-sm mb-2">
-              {currentMobileIndex + 1} of {photoSections.length}
-            </p>
-            <p className="text-gray-300 text-xs">
-              Swipe left or right to view more photos
-            </p>
-          </div>
-
-          {/* Mobile Dot Indicators */}
-          <div className="flex justify-center space-x-2 mb-6">
-            {photoSections.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentMobileIndex(index)}
-                className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                  index === currentMobileIndex
-                    ? "bg-yellow-400 scale-125"
-                    : "bg-gray-600 hover:bg-gray-500"
-                }`}
-                aria-label={`Go to image ${index + 1}`}
-              />
-            ))}
-          </div>
-        </div>
-      ) : (
-        /* Desktop: 3x3 Grid */
-        <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto w-full mb-8 flex-1">
-          {photoSections.map((section) => (
-            <div key={section.id} className="flex flex-col">
+              {/* Images Grid */}
               <div
-                className="aspect-square border-2 border-yellow-400 bg-black rounded-sm mb-2 flex items-center justify-center cursor-pointer hover:border-yellow-300 transition-colors duration-200 group overflow-hidden"
-                onClick={() => openImageModal(section.id)}
+                className={`grid gap-4 ${
+                  isMobile
+                    ? "grid-cols-1"
+                    : photoType.images.length === 1
+                    ? "grid-cols-1 max-w-md"
+                    : photoType.images.length === 2
+                    ? "grid-cols-2"
+                    : "grid-cols-3"
+                }`}
               >
-                <div className="w-full h-full relative group-hover:scale-105 transition-transform duration-200">
-                  <Image
-                    src={section.imagePath || "/placeholder.svg"}
-                    alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${section.label}`}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    priority={section.id === "front"}
-                    onError={() => handleImageError(section.id)}
-                  />
-                </div>
+                {photoType.images.map((imageUrl, index) => (
+                  <div
+                    key={`${photoType.id}-${index}`}
+                    className="aspect-square border-2 border-yellow-400 bg-black rounded-sm cursor-pointer hover:border-yellow-300 transition-colors duration-200 group overflow-hidden"
+                    onClick={() => openImageModal(imageUrl)}
+                  >
+                    <div className="w-full h-full relative group-hover:scale-105 transition-transform duration-200">
+                      <Image
+                        src={imageUrl}
+                        alt={`${displayData.Year} ${displayData.Make} ${
+                          displayData.Model
+                        } - ${photoType.label} ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        priority={photoType.id === "front" && index === 0}
+                      />
+                      {photoType.images.length > 1 && (
+                        <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                          {index + 1}/{photoType.images.length}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <span className="text-yellow-400 text-sm text-center font-medium">
-                {section.label}
-              </span>
             </div>
           ))}
+        </div>
+      ) : (
+        <div className="max-w-4xl mx-auto w-full mb-8 flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-gray-400 text-6xl mb-4">📷</div>
+            <h3 className="text-yellow-400 text-xl font-bold mb-2">
+              No Photos Available
+            </h3>
+            <p className="text-gray-300">
+              Photos for this vehicle haven't been uploaded yet.
+            </p>
+          </div>
         </div>
       )}
 
@@ -599,11 +490,11 @@ export default function VehicleDisplay({
         <div
           className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-4"
           onClick={closeImageModal}
-          onTouchStart={handleModalTouchStart}
-          onTouchMove={handleModalTouchMove}
-          onTouchEnd={handleModalTouchEnd}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
-          {/* Close Button - Fixed position */}
+          {/* Close Button */}
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -628,7 +519,7 @@ export default function VehicleDisplay({
             </svg>
           </button>
 
-          {/* Navigation Arrows - Desktop */}
+          {/* Navigation Arrows */}
           {!isMobile && (
             <>
               {currentImageIndex > 0 && (
@@ -657,7 +548,7 @@ export default function VehicleDisplay({
                 </button>
               )}
 
-              {currentImageIndex < photoSections.length - 1 && (
+              {currentImageIndex < allImages.length - 1 && (
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -763,7 +654,7 @@ export default function VehicleDisplay({
           {/* Image Counter */}
           <div className="fixed top-6 right-20 z-50 bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg border border-yellow-400/30">
             <span className="text-sm text-yellow-400">
-              {currentImageIndex + 1} / {photoSections.length}
+              {currentImageIndex + 1} / {allImages.length}
             </span>
           </div>
 
@@ -771,6 +662,13 @@ export default function VehicleDisplay({
           <div className="fixed bottom-6 left-6 z-50 bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg border border-yellow-400/30">
             <span className="text-sm text-yellow-400">
               Zoom: {Math.round(zoom * 100)}%
+            </span>
+          </div>
+
+          {/* Current Image Type Indicator */}
+          <div className="fixed bottom-6 right-6 z-50 bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg border border-yellow-400/30">
+            <span className="text-sm text-yellow-400">
+              {selectedImageData.type}
             </span>
           </div>
 
@@ -806,8 +704,8 @@ export default function VehicleDisplay({
                   }}
                 >
                   <Image
-                    src={selectedImageData.imagePath || "/placeholder.svg"}
-                    alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${selectedImageData.label}`}
+                    src={selectedImageData.url}
+                    alt={`${displayData.Year} ${displayData.Make} ${displayData.Model} - ${selectedImageData.type}`}
                     width={800}
                     height={600}
                     className="object-contain"
@@ -818,7 +716,6 @@ export default function VehicleDisplay({
                       maxHeight: "60vh",
                     }}
                     priority
-                    onError={() => handleImageError(selectedImageData.id)}
                   />
                 </div>
               </div>
@@ -826,7 +723,7 @@ export default function VehicleDisplay({
               {/* Image Info */}
               <div className="text-center">
                 <h3 className="text-yellow-400 text-xl font-bold mb-2">
-                  {selectedImageData.label}
+                  {selectedImageData.type}
                 </h3>
                 <p className="text-gray-300 text-sm">
                   {displayData.Year} {displayData.Make} {displayData.Model}
@@ -836,7 +733,7 @@ export default function VehicleDisplay({
           </div>
 
           {/* Instructions */}
-          <div className="fixed bottom-6 right-6 z-50 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg border border-yellow-400/30 max-w-xs">
+          <div className="fixed bottom-6 right-20 z-50 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg border border-yellow-400/30 max-w-xs">
             <p className="text-xs text-gray-300">
               {isMobile
                 ? "Swipe left/right to navigate • Pinch to zoom • Tap outside to close"

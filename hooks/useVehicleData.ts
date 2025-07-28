@@ -20,15 +20,15 @@ export interface VehicleData {
 }
 
 export interface VehicleImages {
-  "Front Image"?: string;
-  "Rear Image"?: string;
-  "Drive Side Image"?: string;
-  "Passenger Side Image"?: string;
-  "Interior Image"?: string;
-  "Dashboard Image"?: string;
-  "Tires Image"?: string;
-  "Window Sticker Image"?: string;
-  "Add-ons Damage Image"?: string;
+  "Front Image"?: string[];
+  "Rear Image"?: string[];
+  "Drive Side Image"?: string[];
+  "Passenger Side Image"?: string[];
+  "Interior Image"?: string[];
+  "Dashboard Image"?: string[];
+  "Tires Image"?: string[];
+  "Window Sticker Image"?: string[];
+  "Add-ons Damage Image"?: string[];
 }
 
 export interface UseVehicleDataReturn {
