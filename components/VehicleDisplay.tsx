@@ -84,7 +84,35 @@ export default function VehicleDisplay({
       },
     ];
 
-    return typeConfig
+    // If in demo mode (showError is true), use local images from public/images
+    if (error && !vehicleData) {
+      // Changed from showError to error && !vehicleData
+      const demoImages = {
+        "Front Image": ["/images/Front Image.png"],
+        "Rear Image": ["/images/Rear Image.png"],
+        "Drive Side Image": ["/images/Driver Side.png"],
+        "Passenger Side Image": ["/images/Passenger Side.png"],
+        "Interior Image": ["/images/Interior Image.png"],
+        "Dashboard Image": ["/images/Dashboard Image.png"],
+        "Tires Image": ["/images/Tires Image.png"],
+        "Window Sticker Image": ["/images/Window Iamge.png"], // Note: filename has typo "Iamge"
+        "Add-ons Damage Image": ["/images/Add-ons Image.png"],
+      };
+
+      const demoResult = typeConfig
+        .map((config) => ({
+          label: config.label,
+          id: config.label.toLowerCase().replace(/\s+/g, "-"),
+          airtableColumn: config.airtableColumn,
+          images:
+            demoImages[config.airtableColumn as keyof typeof demoImages] || [],
+        }))
+        .filter((type) => type.images.length > 0); // Only include types with actual images
+      return demoResult;
+    }
+
+    // Use Airtable images when available
+    const airtableResult = typeConfig
       .map((config) => ({
         label: config.label,
         id: config.label.toLowerCase().replace(/\s+/g, "-"),
@@ -92,7 +120,9 @@ export default function VehicleDisplay({
         images: images[config.airtableColumn as keyof typeof images] || [],
       }))
       .filter((type) => type.images.length > 0); // Only include types with actual images
-  }, [images]);
+
+    return airtableResult;
+  }, [images, error, vehicleData]); // Added vehicleData to dependency array
 
   // Create flattened array of all images for modal navigation
   useEffect(() => {
