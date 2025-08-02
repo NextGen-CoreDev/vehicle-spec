@@ -28,6 +28,7 @@ export interface VehicleImages {
   "Dashboard Image"?: string[];
   "Tires Image"?: string[];
   "Window Sticker Image"?: string[];
+  "VIN Image"?: string[];
   "Add-ons Damage Image"?: string[];
 }
 

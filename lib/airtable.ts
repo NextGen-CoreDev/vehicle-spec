@@ -5,6 +5,10 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID!);
 
+// Debug: Log environment variables (remove in production)
+console.log("Airtable API Key exists:", !!process.env.AIRTABLE_API_KEY);
+console.log("Airtable Base ID exists:", !!process.env.AIRTABLE_BASE_ID);
+
 // Define the table names
 export const TABLES = {
   VEHICLES: "Vehicles",
@@ -39,6 +43,7 @@ export interface VehicleRecord {
     "Dashboard Image"?: string;
     "Tires Image"?: string;
     "Window Sticker Image"?: string;
+    "VIN Image"?: string;
     "Add-ons Damage Image"?: string;
   };
 }

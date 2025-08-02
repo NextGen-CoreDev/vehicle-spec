@@ -7,7 +7,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ["blob.v0.dev"],
+    domains: ["blob.v0.dev", "dl.airtable.com", "airtable.com"],
     remotePatterns: [
       {
         protocol: "https",
@@ -15,9 +15,21 @@ const nextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "dl.airtable.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "airtable.com",
+        port: "",
+        pathname: "/**",
+      },
     ],
     unoptimized: true,
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

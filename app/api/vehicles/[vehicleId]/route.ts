@@ -47,10 +47,15 @@ export async function GET(
       "Window Sticker Image": normalizeImageField(
         vehicle.fields["Window Sticker Image"]
       ),
+      "VIN Image": normalizeImageField(vehicle.fields["VIN Image"]),
       "Add-ons Damage Image": normalizeImageField(
         vehicle.fields["Add-ons Damage Image"]
       ),
     };
+
+    // Debug: Log the extracted images
+    console.log("Vehicle fields:", vehicle.fields);
+    console.log("Extracted images:", images);
 
     return NextResponse.json({
       vehicle: vehicle.fields,
