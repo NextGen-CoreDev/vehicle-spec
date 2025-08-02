@@ -79,10 +79,19 @@ export default function VehicleDisplay({
         airtableColumn: "Window Sticker Image",
       },
       {
+        label: "VIN",
+        airtableColumn: "VIN Image",
+      },
+      {
         label: "Add-Ons Damage",
         airtableColumn: "Add-ons Damage Image",
       },
     ];
+
+    // Debug: Log the images data to see what we're getting from Airtable
+    console.log("Images from Airtable:", images);
+    console.log("Vehicle data:", vehicleData);
+    console.log("Error state:", error);
 
     // If in demo mode (showError is true), use local images from public/images
     if (error && !vehicleData) {
@@ -96,6 +105,7 @@ export default function VehicleDisplay({
         "Dashboard Image": ["/images/Dashboard Image.png"],
         "Tires Image": ["/images/Tires Image.png"],
         "Window Sticker Image": ["/images/Window Iamge.png"], // Note: filename has typo "Iamge"
+        "VIN Image": ["/images/VIN Image.png"],
         "Add-ons Damage Image": ["/images/Add-ons Image.png"],
       };
 
@@ -343,7 +353,7 @@ export default function VehicleDisplay({
         {showError && (
           <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 max-w-md mx-auto mb-4">
             <p className="text-yellow-300 text-sm">
-              ⚠️ Using demo data - Airtable connection unavailable
+              ⚠️ This is a demo page. For illustrative purposes only.
             </p>
           </div>
         )}
